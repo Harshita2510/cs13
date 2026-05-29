@@ -5,7 +5,7 @@ import { HelpCircle, MessageSquare, Sword, ArrowRight, Sparkles, Megaphone, Crow
 import { useNavigate } from 'react-router-dom'
 import { PageTransition } from '../components/PageTransition'
 import { useAuth } from '../context/AuthContext'
-import { faqs, doubts, admin } from '../lib/api'
+import { getDoubts, getUsers, onMockStoreChange } from '../lib/mockStore'
 
 const PARTICLES = [
   { left: '15%', dur: '3.2s', delay: '0s' },
@@ -24,9 +24,19 @@ export const DashboardPage = memo(function DashboardPage() {
   const [topUsers, setTopUsers] = useState<{ username: string; sp_points: number }[]>([])
 
   useEffect(() => {
-    faqs.list().then(({ data }) => setFaqCount(data.items.length)).catch(() => {})
-    doubts.list().then(({ data }) => setDoubtCount(data.doubts.length)).catch(() => {})
-    admin.users().then(({ data }) => setTopUsers(data.users.slice(0, 5))).catch(() => {})
+    const loadStats = () => {
+      setFaqCount(0)
+      setDoubtCount(getDoubts().length)
+      setTopUsers(
+        getUsers()
+          .filter(item => item.role === 'user')
+          .sort((a, b) => b.sp_points - a.sp_points)
+          .slice(0, 5),
+      )
+    }
+
+    loadStats()
+    return onMockStoreChange(loadStats)
   }, [])
 
   useEffect(() => {

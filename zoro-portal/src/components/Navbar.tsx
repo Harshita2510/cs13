@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Home, BarChart3, LogOut, Sword, Bell, X, Check } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { admin } from '../lib/api'
 import type { Announcement } from '../types'
 
 const READ_KEY = 'zoro_ann_read'
@@ -12,13 +11,12 @@ export function Navbar() {
   const { user, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [announcements] = useState<Announcement[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [selectedAnn, setSelectedAnn] = useState<Announcement | null>(null)
   const [readIds, setReadIds] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    admin.announcements().then(({ data }) => setAnnouncements(data.announcements)).catch(() => {})
     try {
       const saved = JSON.parse(localStorage.getItem(READ_KEY) ?? '[]')
       setReadIds(new Set(saved))
@@ -73,7 +71,7 @@ export function Navbar() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center gap-2">
 
           {/* Logo */}
-          <Link to="/dashboard" className="flex items-center gap-2.5 mr-4 group">
+          <Link to="/admin" className="flex items-center gap-2.5 mr-4 group">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
               style={{
                 background: 'linear-gradient(135deg, rgba(6,182,212,0.2), rgba(124,58,237,0.2))',
@@ -83,7 +81,7 @@ export function Navbar() {
             >
               <Sword size={17} className="text-[#06b6d4]" />
             </div>
-            <span className="text-white font-bold text-sm tracking-wide">Zoro Portal</span>
+            <span className="text-white font-bold text-sm tracking-wide">Admin Panel</span>
           </Link>
 
           {/* Nav links */}
@@ -183,10 +181,10 @@ export function Navbar() {
           {/* Right side */}
           <div className="flex items-center gap-3 ml-auto">
             {user?.role === 'admin' && (
-              <Link to="/admin-x9k2" className="nav-link group">
-                <BarChart3 size={16} className="text-white/40 group-hover:text-[#06b6d4]" />
-                <span className="text-white/40 group-hover:text-white/80">Admin</span>
-                {location.pathname === '/admin-x9k2' && <motion.div layoutId="nav-pill-admin" className="nav-pill-active" />}
+            <Link to="/admin" className="nav-link group">
+              <BarChart3 size={16} className="text-white/40 group-hover:text-[#06b6d4]" />
+              <span className="text-white/40 group-hover:text-white/80">Admin</span>
+                {location.pathname === '/admin' && <motion.div layoutId="nav-pill-admin" className="nav-pill-active" />}
               </Link>
             )}
 

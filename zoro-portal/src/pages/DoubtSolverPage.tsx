@@ -5,8 +5,8 @@ import toast from 'react-hot-toast'
 import { PageTransition } from '../components/PageTransition'
 import { ListSkeleton, Skeleton } from '../components/Skeleton'
 import { useConfetti } from '../components/Confetti'
-import { doubts as doubtApi, admin as adminApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
+import { createAnswer, createDoubt, getDoubt, getDoubts, onMockStoreChange, resolveDoubt, updateAnswerStatus, upvoteAnswer } from '../lib/mockStore'
 import type { Doubt, Answer } from '../types'
 
 type AnswerStatus = 'pending' | 'approved' | 'rejected'
@@ -60,11 +60,13 @@ function AnswerCard({
   isAdmin,
   onApprove,
   onReject,
+  onUpvote,
 }: {
   answer: Answer
   isAdmin: boolean
   onApprove: (id: number) => void
   onReject: (id: number) => void
+  onUpvote: (id: number) => void
 }) {
   const [loading, setLoading] = useState(false)
 
@@ -74,8 +76,9 @@ function AnswerCard({
     setLoading(false)
   }
   const handleReject = async () => {
-    setLoading(false)
+    setLoading(true)
     await onReject(answer.id)
+    setLoading(false)
   }
 
   const isPending = answer.status === 'pending'
@@ -163,6 +166,7 @@ function AnswerCard({
 
       <div className="flex items-center gap-3 mt-3 ml-0.5">
         <motion.button
+          onClick={() => onUpvote(answer.id)}
           className="flex items-center gap-1.5 text-white/35 hover:text-[#ec4899] text-xs transition-colors"
           whileTap={{ scale: 0.9 }}
         >
@@ -201,80 +205,92 @@ export const DoubtSolverPage = memo(function DoubtSolverPage() {
   const fireConfetti = useConfetti()
 
   useEffect(() => {
-    doubtApi.list().then(({ data }) => { setDoubts(data.doubts); setLoading(false) }).catch(() => setLoading(false))
-  }, [])
+    setDoubts(getDoubts())
+    setLoading(false)
 
-  const openDetail = useCallback(async (id: number) => {
+    return onMockStoreChange(() => {
+      const nextDoubts = getDoubts()
+      setDoubts(nextDoubts)
+
+      if (detailId !== null) {
+        const nextDetail = nextDoubts.find(doubt => doubt.id === detailId) ?? null
+        setDetail(nextDetail)
+        setAnswers(nextDetail?.answers ?? [])
+      }
+    })
+  }, [detailId])
+
+  const openDetail = useCallback((id: number) => {
     setDetailId(id)
     setDetailLoading(true)
     setAnswerFilter('all')
-    try {
-      const { data } = await doubtApi.get(id)
-      setDetail(data.doubt)
-      setAnswers(data.answers)
-    } catch { toast.error('Failed to load') }
+    const nextDetail = getDoubt(id)
+    setDetail(nextDetail)
+    setAnswers(nextDetail?.answers ?? [])
     setDetailLoading(false)
   }, [])
 
-  const handleApprove = useCallback(async (answerId: number) => {
-    try {
-      const { data } = await adminApi.updateAnswerStatus(answerId, 'approved')
-      setAnswers(prev => prev.map(a => a.id === answerId ? data.answer : a))
-      toast.success('✅ Answer approved! +10 SP awarded')
-    } catch { toast.error('Failed to approve') }
+  const handleApprove = useCallback((answerId: number) => {
+    const updatedAnswer = updateAnswerStatus(answerId, 'approved')
+    if (!updatedAnswer) {
+      toast.error('Failed to approve')
+      return
+    }
+    setAnswers(prev => prev.map(a => a.id === answerId ? updatedAnswer : a))
+    toast.success('Answer approved. +10 SP awarded')
   }, [])
 
-  const handleReject = useCallback(async (answerId: number) => {
-    try {
-      const { data } = await adminApi.updateAnswerStatus(answerId, 'rejected')
-      setAnswers(prev => prev.map(a => a.id === answerId ? data.answer : a))
-      toast.success('✗ Answer rejected')
-    } catch { toast.error('Failed to reject') }
+  const handleReject = useCallback((answerId: number) => {
+    const updatedAnswer = updateAnswerStatus(answerId, 'rejected')
+    if (!updatedAnswer) {
+      toast.error('Failed to reject')
+      return
+    }
+    setAnswers(prev => prev.map(a => a.id === answerId ? updatedAnswer : a))
+    toast.success('Answer rejected')
   }, [])
 
   const submitDoubt = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim() || !body.trim()) return
+    if (!title.trim() || !body.trim() || !user) return
     setSubmitting(true)
-    try {
-      const { data } = await doubtApi.create(title, body)
-      setDoubts(prev => [data.doubt, ...prev])
-      setModalOpen(false); setTitle(''); setBody('')
-      toast.success('Doubt raised!')
-    } catch { toast.error('Failed to raise doubt') }
+    createDoubt(title, body, user)
+    setDoubts(getDoubts())
+    setModalOpen(false); setTitle(''); setBody('')
+    toast.success('Doubt raised!')
     setSubmitting(false)
-  }, [title, body])
+  }, [title, body, user])
 
   const submitAnswer = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!activeAnswer.trim() || detailId === null) return
+    if (!activeAnswer.trim() || detailId === null || !user) return
     setDetailLoading(true)
-    try {
-      const { data } = await doubtApi.answer(detailId, activeAnswer)
-      setAnswers(prev => [...prev, data.answer])
-      setActiveAnswer('')
-      toast.success('Answer posted!')
-    } catch { toast.error('Failed to post answer') }
+    createAnswer(detailId, activeAnswer, user)
+    const nextDetail = getDoubt(detailId)
+    setDetail(nextDetail)
+    setAnswers(nextDetail?.answers ?? [])
+    setActiveAnswer('')
+    toast.success('Answer submitted for admin review')
     setDetailLoading(false)
-  }, [activeAnswer, detailId])
+  }, [activeAnswer, detailId, user])
 
   const handleUpvote = useCallback(async (answerId: number) => {
-    setAnswers(prev => prev.map(a => a.id === answerId ? { ...a, upvotes: a.upvotes + 1 } : a))
-    try {
-      await doubtApi.upvote(answerId)
-      toast.success('+5 SP points!')
-    } catch { toast.error('Upvote failed') }
-  }, [])
+    upvoteAnswer(answerId)
+    if (detailId !== null) {
+      const nextDetail = getDoubt(detailId)
+      setDetail(nextDetail)
+      setAnswers(nextDetail?.answers ?? [])
+    }
+    toast.success('Upvoted')
+  }, [detailId])
 
   const handleResolve = useCallback(async () => {
     if (!detailId) return
-    try {
-      await doubtApi.resolve(detailId)
-      setDoubts(prev => prev.map(d => d.id === detailId ? { ...d, status: 'resolved' } : d))
-      if (detail) setDetail({ ...detail, status: 'resolved' })
-      fireConfetti()
-      toast.success('Resolved! +20 SP points!')
-    } catch { toast.error('Failed to resolve') }
+    resolveDoubt(detailId)
+    setDoubts(prev => prev.map(d => d.id === detailId ? { ...d, status: 'resolved' } : d))
+    if (detail) setDetail({ ...detail, status: 'resolved' })
+    fireConfetti()
+    toast.success('Marked as resolved')
   }, [detailId, detail, fireConfetti])
 
   const filteredAnswers = answerFilter === 'all'
@@ -403,6 +419,7 @@ export const DoubtSolverPage = memo(function DoubtSolverPage() {
                             isAdmin={isAdmin}
                             onApprove={handleApprove}
                             onReject={handleReject}
+                            onUpvote={handleUpvote}
                           />
                         ))
                       )}
@@ -415,9 +432,11 @@ export const DoubtSolverPage = memo(function DoubtSolverPage() {
                         <motion.button type="submit" className="bg-[#7c3aed] rounded-full p-2.5 text-white" whileTap={{ scale: 0.9 }}>
                           <MessageSquare size={18} />
                         </motion.button>
-                        <motion.button type="button" onClick={handleResolve} className="bg-green-600 rounded-full p-2.5 text-white" whileTap={{ scale: 0.9 }} title="Mark resolved">
-                          <CheckCircle2 size={18} />
-                        </motion.button>
+                        {isAdmin && (
+                          <motion.button type="button" onClick={handleResolve} className="bg-green-600 rounded-full p-2.5 text-white" whileTap={{ scale: 0.9 }} title="Mark resolved">
+                            <CheckCircle2 size={18} />
+                          </motion.button>
+                        )}
                       </form>
                     )}
 
