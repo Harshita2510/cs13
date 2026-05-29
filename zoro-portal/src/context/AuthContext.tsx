@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { findUserByCredential, getUsers, onMockStoreChange } from '../lib/mockStore'
+import { findUserByCredential, getUsers, onMockStoreChange, registerUser } from '../lib/mockStore'
 import type { User } from '../types'
 
 const ADMIN_CREDENTIALS = {
@@ -13,6 +13,7 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   login: (username: string, password: string) => Promise<{ error?: string; user?: User }>
+  signup: (name: string, email: string, password: string) => Promise<{ error?: string; user?: User }>
   logout: () => Promise<void>
 }
 
@@ -69,12 +70,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: `Invalid ${adminHint} credentials` }
   }
 
+  const signup = async (name: string, email: string, password: string) => {
+    const result = registerUser(name, email, password)
+    if (result.error || !result.user) return result
+
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.user))
+    setUser(result.user)
+    return { user: result.user }
+  }
+
   const logout = async () => {
     localStorage.removeItem(AUTH_STORAGE_KEY)
     setUser(null)
   }
 
-  return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, loading, login, signup, logout }}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)

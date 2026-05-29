@@ -17,28 +17,33 @@ const C = {
 }
 
 export const LoginPage = memo(function LoginPage() {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [shake, setShake] = useState(false)
-  const { login } = useAuth()
+  const { login, signup } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username || !password) return
+    if (!username || !password || (mode === 'signup' && !name.trim())) return
     setLoading(true)
-    const result = await login(username, password)
+    const result = mode === 'signup'
+      ? await signup(name, username, password)
+      : await login(username, password)
+
     if (result.error) {
       setShake(true)
       setTimeout(() => setShake(false), 600)
       toast.error(result.error)
       setLoading(false)
     } else {
-      toast.success(result.user?.role === 'admin' ? 'Welcome back, admin!' : 'Welcome back!')
+      toast.success(mode === 'signup' ? 'Account created!' : result.user?.role === 'admin' ? 'Welcome back, admin!' : 'Welcome back!')
       navigate(result.user?.role === 'admin' ? '/admin' : '/doubts')
     }
-  }, [username, password, login, navigate])
+  }, [mode, name, username, password, login, signup, navigate])
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -127,6 +132,24 @@ export const LoginPage = memo(function LoginPage() {
           </motion.p>
         </motion.div>
 
+        <div className="grid grid-cols-2 gap-2 mb-6 rounded-2xl p-1 bg-white/[0.04] border border-white/10">
+          {[
+            { key: 'signin' as const, label: 'Sign In' },
+            { key: 'signup' as const, label: 'Sign Up' },
+          ].map(item => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setMode(item.key)}
+              className={`h-10 rounded-xl text-sm font-semibold transition-all ${
+                mode === item.key ? 'bg-[#7c3aed] text-white shadow-lg shadow-[#7c3aed]/20' : 'text-white/45 hover:text-white/75'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         {/* Form */}
         <motion.form
           onSubmit={handleSubmit}
@@ -135,6 +158,23 @@ export const LoginPage = memo(function LoginPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
+          {mode === 'signup' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold tracking-wider uppercase" style={{ color: C.textDim }}>
+                Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Your name"
+                className="cosmic-input"
+                autoComplete="name"
+                required
+              />
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <label className="text-xs font-semibold tracking-wider uppercase" style={{ color: C.textDim }}>
               Email
@@ -167,7 +207,7 @@ export const LoginPage = memo(function LoginPage() {
 
           <motion.button
             type="submit"
-            disabled={loading || !username || !password}
+            disabled={loading || !username || !password || (mode === 'signup' && !name.trim())}
             className="cosmic-btn-primary w-full mt-2"
             style={{ fontSize: '15px', padding: '14px 24px' }}
             whileTap={{ scale: 0.97 }}
@@ -175,11 +215,11 @@ export const LoginPage = memo(function LoginPage() {
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                <span>Signing in...</span>
+                <span>{mode === 'signup' ? 'Creating...' : 'Signing in...'}</span>
               </>
             ) : (
               <>
-                <span>Sign In</span>
+                <span>{mode === 'signup' ? 'Create Account' : 'Sign In'}</span>
                 <ArrowRight size={17} />
               </>
             )}
@@ -187,38 +227,40 @@ export const LoginPage = memo(function LoginPage() {
         </motion.form>
 
         {/* Demo credentials */}
-        <motion.div
-          className="mt-8 rounded-2xl p-4 text-center"
-          style={{
-            background: 'rgba(139,92,246,0.06)',
-            border: '1px solid rgba(139,92,246,0.12)',
-          }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-        >
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: C.textMuted }}>
-            Demo Credentials
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {demoCredentials.map(cred => (
-              <button
-                key={cred.email}
-                type="button"
-                onClick={() => { setUsername(cred.email); setPassword(cred.password) }}
-                className="px-3 py-2 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] text-left"
-                style={{
-                  background: 'rgba(139,92,246,0.1)',
-                  border: '1px solid rgba(139,92,246,0.2)',
-                  color: 'rgba(199,179,255,0.75)',
-                }}
-              >
-                <span className="block text-white/80">{cred.label}</span>
-                <span className="block text-white/30 mt-0.5 truncate">{cred.role}</span>
-              </button>
-            ))}
-          </div>
-        </motion.div>
+        {mode === 'signin' && (
+          <motion.div
+            className="mt-8 rounded-2xl p-4 text-center"
+            style={{
+              background: 'rgba(139,92,246,0.06)',
+              border: '1px solid rgba(139,92,246,0.12)',
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: C.textMuted }}>
+              Demo Credentials
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {demoCredentials.map(cred => (
+                <button
+                  key={cred.email}
+                  type="button"
+                  onClick={() => { setUsername(cred.email); setPassword(cred.password); setName(cred.username) }}
+                  className="px-3 py-2 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] text-left"
+                  style={{
+                    background: 'rgba(139,92,246,0.1)',
+                    border: '1px solid rgba(139,92,246,0.2)',
+                    color: 'rgba(199,179,255,0.75)',
+                  }}
+                >
+                  <span className="block text-white/80">{cred.label}</span>
+                  <span className="block text-white/30 mt-0.5 truncate">{cred.role}</span>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
         {/* Footer tagline */}
         <motion.p

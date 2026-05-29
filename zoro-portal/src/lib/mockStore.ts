@@ -2,22 +2,32 @@ import type { Answer, AnswerStatus, Doubt, User } from '../types'
 
 const DOUBTS_KEY = 'zoro_mock_doubts'
 const USERS_KEY = 'zoro_mock_users'
+const CREDENTIALS_KEY = 'zoro_mock_credentials'
 const STORE_EVENT = 'zoro_mock_store_changed'
 const ANSWER_SP_REWARD = 10
+
+type MockCredential = {
+  email: string
+  password: string
+  role: 'admin' | 'user'
+  username: string
+  label: string
+  userId: number
+}
 
 export interface AdminAnswer extends Answer {
   question: string
   question_body: string
 }
 
-export const demoCredentials = [
-  { email: 'admin@example.com', password: 'admin123', role: 'admin' as const, username: 'admin@example.com', label: 'Admin' },
-  { email: 'demo@example.com', password: 'user123', role: 'user' as const, username: 'Demo Student', label: 'Demo' },
-  { email: 'arushi@example.com', password: 'user123', role: 'user' as const, username: 'Arushi Rao', label: 'Arushi' },
-  { email: 'rahul@example.com', password: 'user123', role: 'user' as const, username: 'Rahul Mehta', label: 'Rahul' },
-  { email: 'neha@example.com', password: 'user123', role: 'user' as const, username: 'Neha Gupta', label: 'Neha' },
-  { email: 'priya@example.com', password: 'user123', role: 'user' as const, username: 'Priya Sharma', label: 'Priya' },
-  { email: 'amit@example.com', password: 'user123', role: 'user' as const, username: 'Amit Verma', label: 'Amit' },
+export const demoCredentials: MockCredential[] = [
+  { email: 'admin@example.com', password: 'admin123', role: 'admin' as const, username: 'admin@example.com', label: 'Admin', userId: 1 },
+  { email: 'demo@example.com', password: 'user123', role: 'user' as const, username: 'Demo Student', label: 'Demo', userId: 2 },
+  { email: 'arushi@example.com', password: 'user123', role: 'user' as const, username: 'Arushi Rao', label: 'Arushi', userId: 3 },
+  { email: 'rahul@example.com', password: 'user123', role: 'user' as const, username: 'Rahul Mehta', label: 'Rahul', userId: 4 },
+  { email: 'neha@example.com', password: 'user123', role: 'user' as const, username: 'Neha Gupta', label: 'Neha', userId: 5 },
+  { email: 'priya@example.com', password: 'user123', role: 'user' as const, username: 'Priya Sharma', label: 'Priya', userId: 6 },
+  { email: 'amit@example.com', password: 'user123', role: 'user' as const, username: 'Amit Verma', label: 'Amit', userId: 7 },
 ]
 
 const seedUsers: User[] = [
@@ -161,11 +171,62 @@ export function saveUsers(users: User[]) {
   writeJson(USERS_KEY, users)
 }
 
+export function getCredentials() {
+  const savedCredentials = readJson<MockCredential[]>(CREDENTIALS_KEY, demoCredentials)
+  const normalizedCredentials = savedCredentials.map(savedCredential => {
+    const seedCredential = demoCredentials.find(item => item.email === savedCredential.email)
+    return seedCredential ? { ...seedCredential, ...savedCredential, userId: seedCredential.userId } : savedCredential
+  })
+  const mergedCredentials = [
+    ...normalizedCredentials,
+    ...demoCredentials.filter(seedCredential => !normalizedCredentials.some(savedCredential => savedCredential.email === seedCredential.email)),
+  ]
+
+  if (JSON.stringify(mergedCredentials) !== JSON.stringify(savedCredentials)) {
+    writeJson(CREDENTIALS_KEY, mergedCredentials)
+  }
+
+  return mergedCredentials
+}
+
+export function registerUser(name: string, email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase()
+  const displayName = name.trim()
+  const credentials = getCredentials()
+
+  if (credentials.some(credential => credential.email === normalizedEmail)) {
+    return { error: 'An account already exists with this email' }
+  }
+
+  const users = getUsers()
+  const user: User = {
+    id: nextId(users.map(item => item.id)),
+    username: displayName,
+    role: 'user',
+    sp_points: 0,
+    created_at: new Date().toISOString(),
+  }
+
+  const credential: MockCredential = {
+    email: normalizedEmail,
+    password,
+    role: 'user',
+    username: displayName,
+    label: displayName.split(' ')[0] || normalizedEmail,
+    userId: user.id,
+  }
+
+  saveUsers([...users, user])
+  writeJson(CREDENTIALS_KEY, [...credentials, credential])
+
+  return { user }
+}
+
 export function findUserByCredential(email: string, password: string) {
-  const credential = demoCredentials.find(item => item.email === email && item.password === password)
+  const credential = getCredentials().find(item => item.email === email && item.password === password)
   if (!credential) return null
 
-  return getUsers().find(user => user.username === credential.username && user.role === credential.role) ?? null
+  return getUsers().find(user => user.id === credential.userId) ?? null
 }
 
 export function getDoubts() {
