@@ -4,6 +4,7 @@ import { Sword, Loader2, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { demoCredentials } from '../lib/mockStore'
 
 const C = {
   accent: '#7c3aed',
@@ -34,8 +35,8 @@ export const LoginPage = memo(function LoginPage() {
       toast.error(result.error)
       setLoading(false)
     } else {
-      toast.success('Welcome back!')
-      navigate('/dashboard')
+      toast.success(result.user?.role === 'admin' ? 'Welcome back, admin!' : 'Welcome back!')
+      navigate(result.user?.role === 'admin' ? '/admin' : '/doubts')
     }
   }, [username, password, login, navigate])
 
@@ -67,7 +68,7 @@ export const LoginPage = memo(function LoginPage() {
 
       {/* Login card */}
       <motion.div
-        className="glass-card shimmer-border rounded-3xl p-10 sm:p-12 w-full max-w-md relative"
+        className="glass-card shimmer-border rounded-3xl p-8 sm:p-10 w-full max-w-lg relative"
         animate={shake ? { x: [-8, 8, -6, 6, -3, 3, 0] } : {}}
         transition={{ duration: 0.55 }}
         style={{ borderColor: 'rgba(139,92,246,0.25)' }}
@@ -122,7 +123,7 @@ export const LoginPage = memo(function LoginPage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35, duration: 0.5 }}
           >
-            Institute knowledge hub · AI assistant · Doubt solver
+            Sign in as an admin or student to test the doubt workflow.
           </motion.p>
         </motion.div>
 
@@ -136,13 +137,13 @@ export const LoginPage = memo(function LoginPage() {
         >
           <div className="space-y-1.5">
             <label className="text-xs font-semibold tracking-wider uppercase" style={{ color: C.textDim }}>
-              Username
+              Email
             </label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              placeholder="admin@example.com"
               className="cosmic-input"
               autoComplete="username"
               required
@@ -199,24 +200,21 @@ export const LoginPage = memo(function LoginPage() {
           <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: C.textMuted }}>
             Demo Credentials
           </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {[
-              { u: 'admin', p: 'admin123', label: 'Admin' },
-              { u: 'demo', p: 'user123', label: 'Demo' },
-              { u: 'arushi', p: 'user123', label: 'Arushi' },
-            ].map(cred => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {demoCredentials.map(cred => (
               <button
-                key={cred.u}
+                key={cred.email}
                 type="button"
-                onClick={() => { setUsername(cred.u); setPassword(cred.p) }}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
+                onClick={() => { setUsername(cred.email); setPassword(cred.password) }}
+                className="px-3 py-2 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] text-left"
                 style={{
                   background: 'rgba(139,92,246,0.1)',
                   border: '1px solid rgba(139,92,246,0.2)',
                   color: 'rgba(199,179,255,0.75)',
                 }}
               >
-                {cred.label}
+                <span className="block text-white/80">{cred.label}</span>
+                <span className="block text-white/30 mt-0.5 truncate">{cred.role}</span>
               </button>
             ))}
           </div>
@@ -230,7 +228,7 @@ export const LoginPage = memo(function LoginPage() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
         >
-          Powered by Zoro AI · Built for institutions
+          Frontend-only demo · Ready for backend integration
         </motion.p>
       </motion.div>
     </div>

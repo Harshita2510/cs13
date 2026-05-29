@@ -40,7 +40,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   if (loading) return <PageLoader />
-  if (!user || user.role !== 'admin') return <Navigate to="/dashboard" replace />
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== 'admin') return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }
 
@@ -61,7 +62,8 @@ function AnimatedRoutes() {
             <Route path="/faq" element={<ProtectedRoute><FAQPage /></ProtectedRoute>} />
             <Route path="/doubts" element={<ProtectedRoute><DoubtSolverPage /></ProtectedRoute>} />
             <Route path="/zoro" element={<ProtectedRoute><ZoroPage /></ProtectedRoute>} />
-            <Route path="/admin-x9k2" element={<AdminRoute><AdminPage /></AdminRoute>} />
+            <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+            <Route path="/admin-x9k2" element={<Navigate to="/admin" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </Suspense>

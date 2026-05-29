@@ -1,11 +1,18 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { auth } from '../lib/api'
+import { findUserByCredential, getUsers, onMockStoreChange } from '../lib/mockStore'
 import type { User } from '../types'
+
+const ADMIN_CREDENTIALS = {
+  email: 'admin@example.com',
+  password: 'admin123',
+}
+
+const AUTH_STORAGE_KEY = 'zoro_admin_user'
 
 interface AuthContextType {
   user: User | null
   loading: boolean
-  login: (username: string, password: string) => Promise<{ error?: string }>
+  login: (username: string, password: string) => Promise<{ error?: string; user?: User }>
   logout: () => Promise<void>
 }
 
@@ -16,21 +23,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    auth.me().then(({ data }) => setUser(data.user)).catch(() => setUser(null)).finally(() => setLoading(false))
+    const loadUser = () => {
+      const savedUser = localStorage.getItem(AUTH_STORAGE_KEY)
+      if (!savedUser) {
+        setUser(null)
+        return
+      }
+
+      const parsedUser = JSON.parse(savedUser) as User
+      const freshUser = getUsers().find(item => item.id === parsedUser.id) ?? parsedUser
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(freshUser))
+      setUser(freshUser)
+    }
+
+    try {
+      loadUser()
+    } catch {
+      localStorage.removeItem(AUTH_STORAGE_KEY)
+      setUser(null)
+    } finally {
+      setLoading(false)
+    }
+
+    return onMockStoreChange(() => {
+      try {
+        loadUser()
+      } catch {
+        localStorage.removeItem(AUTH_STORAGE_KEY)
+        setUser(null)
+      }
+    })
   }, [])
 
   const login = async (username: string, password: string) => {
-    try {
-      const { data } = await auth.login(username, password)
-      setUser(data.user)
-      return {}
-    } catch (err: any) {
-      return { error: err?.response?.data?.error || 'Login failed' }
+    const email = username.trim().toLowerCase()
+    const matchedUser = findUserByCredential(email, password)
+
+    if (matchedUser) {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(matchedUser))
+      setUser(matchedUser)
+      return { user: matchedUser }
     }
+
+    const adminHint = email === ADMIN_CREDENTIALS.email ? 'admin' : 'user'
+    return { error: `Invalid ${adminHint} credentials` }
   }
 
   const logout = async () => {
-    await auth.logout()
+    localStorage.removeItem(AUTH_STORAGE_KEY)
     setUser(null)
   }
 

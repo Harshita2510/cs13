@@ -32,6 +32,7 @@ export interface Answer {
   is_accepted: number
   status: AnswerStatus
   created_at: string
+  sp_awarded?: boolean
 }
 
 // Doubt
